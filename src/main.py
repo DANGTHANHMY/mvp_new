@@ -1,4 +1,5 @@
 import argparse
+import argparse
 import os
 import sys
 import logging
@@ -13,15 +14,18 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
+
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 from transformers import AdamW, T5Tokenizer
-from t5 import MyT5ForConditionalGeneration
 from transformers import get_linear_schedule_with_warmup
 
+import transformers
+
+from t5 import MyT5ForConditionalGeneration
 from data_utils import ABSADataset, task_data_list, cal_entropy
 from const import *
 from data_utils import read_line_examples_from_file
@@ -53,41 +57,48 @@ def init_args():
     # basic settings
     parser.add_argument("--data_path", default="../data/", type=str)
     parser.add_argument(
-        "--task",
-        default='asqp',
-        choices=["asqp", "acos", "aste", "tasd", "unified", "unified3"],
-        type=str,
-        help="The name of the task, selected from: [asqp, tasd, aste]")
+                        "--task",
+                        default='asqp',
+                        choices=["asqp", "acos", "aste", "tasd", "unified", "unified3"],
+                        type=str,
+                        help="The name of the task, selected from: [asqp, tasd, aste]"
+                        )
     parser.add_argument(
-        "--dataset",
-        default='rest15',
-        type=str,
-        help="The name of the dataset, selected from: [rest15, rest16]")
+                        "--dataset",
+                        default='rest15',
+                        type=str,
+                        help="The name of the dataset, selected from: [rest15, rest16]")
     parser.add_argument(
-        "--eval_data_split",
-        default='test',
-        choices=["test", "dev"],
-        type=str,
-    )
+                        "--eval_data_split",
+                        default='test',
+                        choices=["test", "dev"],
+                        type=str,
+                        )
     parser.add_argument("--model_name_or_path",
                         default='t5-base',
                         type=str,
-                        help="Path to pre-trained model or shortcut name")
+                        help="Path to pre-trained model or shortcut name"
+                        )
     parser.add_argument("--output_dir",
                         default='outputs/temp',
                         type=str,
-                        help="Output directory")
+                        help="Output directory"
+                        )
     parser.add_argument("--load_ckpt_name",
                         default=None,
                         type=str,
-                        help="load ckpt path")
+                        help="load ckpt path"
+                        )
     parser.add_argument("--do_train",
+                        # default=True,
                         action='store_true',
-                        help="Whether to run training.")
+                        help="Whether to run training."
+                        )
     parser.add_argument(
-        "--do_inference",
-        default=True,
-        help="Whether to run inference with trained checkpoints")
+                        "--do_inference",
+                        default=False,
+                        help="Whether to run inference with trained checkpoints"
+                        )
 
     # other parameters
     parser.add_argument("--max_seq_length", default=200, type=int)
@@ -95,27 +106,31 @@ def init_args():
     parser.add_argument("--train_batch_size",
                         default=16,
                         type=int,
-                        help="Batch size per GPU/CPU for training.")
+                        help="Batch size per GPU/CPU for training."
+                        )
     parser.add_argument("--eval_batch_size",
                         default=64,
                         type=int,
-                        help="Batch size per GPU/CPU for evaluation.")
+                        help="Batch size per GPU/CPU for evaluation."
+                        )
     parser.add_argument(
-        '--gradient_accumulation_steps',
-        type=int,
-        default=1,
-        help=
-        "Number of updates steps to accumulate before performing a backward/update pass."
-    )
+                        '--gradient_accumulation_steps',
+                        type=int,
+                        default=1,
+                        help=
+                        "Number of updates steps to accumulate before performing a backward/update pass."
+                        )
     parser.add_argument("--learning_rate", default=1e-4, type=float)
     parser.add_argument("--num_train_epochs",
                         default=20,
                         type=int,
-                        help="Total number of training epochs to perform.")
+                        help="Total number of training epochs to perform."
+                        )
     parser.add_argument('--seed',
                         type=int,
                         default=25,
-                        help="random seed for initialization")
+                        help="random seed for initialization"
+                        )
 
     # training details
     parser.add_argument("--weight_decay", default=0.0, type=float)
@@ -152,7 +167,8 @@ def init_args():
                         type=float,
                         help="low resource data ratio")
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     # set up output dir which looks like './outputs/rest15/'
     if not os.path.exists('./outputs'):
@@ -337,7 +353,7 @@ class T5FineTuner(pl.LightningModule):
             for k,v in cate_list.items():
                 tokenize_res = []
                 for w in v:
-                    tokenize_res.extend(self.tokenizer(w, return_tensors='pt')['input_ids'].tolist()[0]) 
+                    tokenize_res.extend(self.tokenizer(w, return_tensors='pt')['input_ids'].tolist()[0])
                 dic["cate_tokens"][k] = tokenize_res
             sp_tokenize_res = []
             for sp in ['great', 'ok', 'bad']:
@@ -347,7 +363,7 @@ class T5FineTuner(pl.LightningModule):
             dic['sentiment_tokens'] = sp_tokenize_res
             special_tokens_tokenize_res = []
             for w in ['[O','[A','[S','[C','[SS']:
-                special_tokens_tokenize_res.extend(self.tokenizer(w, return_tensors='pt')['input_ids'].tolist()[0]) 
+                special_tokens_tokenize_res.extend(self.tokenizer(w, return_tensors='pt')['input_ids'].tolist()[0])
             special_tokens_tokenize_res = [r for r in special_tokens_tokenize_res if r != 784]
             dic['special_tokens'] = special_tokens_tokenize_res
             import json
@@ -379,10 +395,10 @@ class T5FineTuner(pl.LightningModule):
 
         if cur_id in to_id['[']:
             return force_tokens['special_tokens']
-        elif cur_id in to_id['AT'] + to_id['OT'] + to_id['EP'] + to_id['SP'] + to_id['AC']:  
-            return to_id[']']  
-        elif cur_id in to_id['SS']:  
-            return to_id['EP'] 
+        elif cur_id in to_id['AT'] + to_id['OT'] + to_id['EP'] + to_id['SP'] + to_id['AC']:
+            return to_id[']']
+        elif cur_id in to_id['SS']:
+            return to_id['EP']
 
         # get cur_term
         if last_left_brace_pos == -1:
@@ -398,9 +414,9 @@ class T5FineTuner(pl.LightningModule):
             ret = force_tokens['sentiment_tokens'][task]
         elif cur_term in to_id['AT']:  # AT
             force_list = source_ids[batch_id].tolist()
-            if task != 'aste':  
-                force_list.extend(to_id['it'] + [1])  
-            ret = force_list  
+            if task != 'aste':
+                force_list.extend(to_id['it'] + [1])
+            ret = force_list
         elif cur_term in to_id['SS']:
             ret = [3] + to_id[']'] + [1]
         elif cur_term in to_id['AC']:  # AC
@@ -420,7 +436,7 @@ class T5FineTuner(pl.LightningModule):
                 ret.discard(w)
             ret = list(ret)
         elif num_left_brace > num_right_brace:
-            ret += to_id[']'] 
+            ret += to_id[']']
         else:
             raise ValueError
         ret.extend(to_id['['] + [1]) # add [
@@ -501,7 +517,7 @@ def evaluate(model, task, data, data_type):
         if args.agg_strategy == 'post_rank':
             inputs = [ele for ele in sents for _ in range(num_path)]
             assert len(_outputs) == len(inputs), (len(_outputs), len(inputs))
-            preds = [[o] for o in _outputs] 
+            preds = [[o] for o in _outputs]
             model_path = os.path.join(args.output_dir, "final")
             scores = cal_entropy(inputs, preds, model_path, model.tokenizer)
 
@@ -677,8 +693,8 @@ def train_function(args):
         trainer.fit(model)
 
         # save the final model
-        model.model.save_pretrained(os.path.join(args.output_dir, "final"))
-        tokenizer.save_pretrained(os.path.join(args.output_dir, "final"))
+        model.model.save_pretrained(os.path.join(args.output_dir, "final"), safe_serialization=False)
+        tokenizer.save_pretrained(os.path.join(args.output_dir, "final"), safe_serialization=False)
         print("Finish training and saving the model!")
 
     if args.do_inference:
@@ -689,8 +705,8 @@ def train_function(args):
         print(
             'Note that a pretrained model is required and `do_true` should be False'
         )
-        model_path = os.path.join(args.output_dir, "final")
-        # model_path = args.model_name_or_path  # for loading ckpt
+        # model_path = os.path.join(args.output_dir, "final")
+        model_path = args.model_name_or_path  # for loading ckpt
 
         tokenizer = T5Tokenizer.from_pretrained(model_path)
         tfm_model = MyT5ForConditionalGeneration.from_pretrained(model_path)
@@ -740,6 +756,8 @@ def train_function(args):
 
 if __name__ == '__main__':
     args = init_args()
+    args.do_inference = False
+    args.load_ckpt_name = True
     set_seed(args.seed)
     train_function(args)
 
