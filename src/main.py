@@ -757,7 +757,7 @@ def train_function(args):
 if __name__ == '__main__':
     args = init_args()
     args.do_inference = True
-    args.load_ckpt_name = True
+    args.load_ckpt_name = "checkpoint.pth"
     set_seed(args.seed)
     train_function(args)
 
