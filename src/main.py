@@ -712,14 +712,14 @@ def train_function(args):
         tfm_model = MyT5ForConditionalGeneration.from_pretrained(model_path)
         model = T5FineTuner(args, tfm_model, tokenizer)
 
-        if args.load_ckpt_name:
-            ckpt_path = os.path.join(args.output_dir, args.load_ckpt_name)
-            print("Loading ckpt:", ckpt_path)
-            if not os.path.exists(ckpt_path):
-                os.mkdir(ckpt_path)
+        # if args.load_ckpt_name:
+        #     ckpt_path = os.path.join(args.output_dir, args.load_ckpt_name)
+        #     print("Loading ckpt:", ckpt_path)
+        #     if not os.path.exists(ckpt_path):
+        #         os.mkdir(ckpt_path)
 
-            checkpoint = torch.load(ckpt_path)
-            model.load_state_dict(checkpoint["state_dict"])
+        #     checkpoint = torch.load(ckpt_path)
+        #     model.load_state_dict(checkpoint["state_dict"])
 
         log_file_path = os.path.join(args.output_dir, "result.txt")
 
@@ -760,7 +760,7 @@ def train_function(args):
 if __name__ == '__main__':
     args = init_args()
     args.do_inference = True
-    args.load_ckpt_name = "checkpoint.pth"
+    # args.load_ckpt_name = "checkpoint.pth"
     set_seed(args.seed)
     train_function(args)
 
