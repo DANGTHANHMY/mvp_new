@@ -715,6 +715,9 @@ def train_function(args):
         if args.load_ckpt_name:
             ckpt_path = os.path.join(args.output_dir, args.load_ckpt_name)
             print("Loading ckpt:", ckpt_path)
+            if not os.path.exists(ckpt_path):
+                os.mkdir(ckpt_path)
+
             checkpoint = torch.load(ckpt_path)
             model.load_state_dict(checkpoint["state_dict"])
 
